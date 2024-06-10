@@ -45,7 +45,7 @@ description: |
   os_minor = @host.operatingsystem.minor.to_i
   realm_compatible = (@host.operatingsystem.name == 'Fedora' && os_major >= 20) || (rhel_compatible && os_major >= 7)
   # safemode renderer does not support unary negation
-  # pm_set = false
+  pm_set = false
   proxy_uri = host_param('http-proxy') ? "http://#{host_param('http-proxy')}:#{host_param('http-proxy-port')}" : nil
   proxy_string = proxy_uri ? " --proxy=#{proxy_uri}" : ''
   puppet_enabled = pm_set || host_param_true?('force-puppet')
@@ -176,10 +176,19 @@ authselect --useshadow --passalgo=<%= @host.operatingsystem.password_hash.downca
 <% else -%>
 authconfig --useshadow --passalgo=<%= @host.operatingsystem.password_hash.downcase || 'sha256' %> --kickstart
 <% end -%>
+
 <% if use_ntp -%>
+<% if (is_fedora && os_major >= 28) || (rhel_compatible && os_major > 8) -%>
+timesource --ntp-server <%= host_param('ntp-server') %>
+<% else -%>
 timezone --utc <%= host_param('time-zone') || 'UTC' %>
+<% end -%>
+<% else -%>
+<% if (is_fedora && os_major >= 28) || (rhel_compatible && os_major > 8) -%>
+timesource --ntp-server <%= host_param('ntp-server') %>
 <% else -%>
 timezone --utc <%= host_param('time-zone') || 'UTC' %> <%= host_param('ntp-server') ? "--ntpservers #{host_param('ntp-server')}" : '' %>
+<% end -%>
 <% end -%>
 
 <% if rhel_compatible -%>
