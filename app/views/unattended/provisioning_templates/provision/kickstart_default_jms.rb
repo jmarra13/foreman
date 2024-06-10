@@ -3,40 +3,41 @@ kind: provision
 name: Kickstart default
 model: ProvisioningTemplate
 oses:
+- AlmaLinux
 - CentOS
+- CentOS_Stream
 - Fedora
 - RedHat
-%>
-<%#
-This template accepts the following parameters:
-- lang: string (default="en_US.UTF-8")
-- selinux-mode: string (default="enforcing")
-- keyboard: string (default="us")
-- time-zone: string (default="UTC")
-- http-proxy: string (default="")
-- http-proxy-port: string (default="")
-- force-puppet: boolean (default=false)
-- enable-epel: boolean (default=true)
-- enable-puppetlabs-repo: boolean (default=false)
-- enable-puppetlabs-puppet5-repo: boolean (default=false)
-- enable-puppetlabs-puppet6-repo: boolean (default=false)
-- salt_master: string (default=undef)
-- ntp-server: string (default=undef)
-- bootloader-append: string (default="nofb quiet splash=quiet")
-- disable-firewall: boolean (default=false)
-- package_upgrade: boolean (default=true)
-- disable-uek: boolean (default=false)
-- use-ntp: boolean (default depends on OS release)
-- fips_enabled: boolean (default=false)
-
-Reference links:
-https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/installation_guide/s1-kickstart2-options
-https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/installation_guide/sect-kickstart-syntax
-https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/performing_an_advanced_rhel_installation/kickstart-commands-and-options-reference_installing-rhel-as-an-experienced-user
-%>
-
-# This kickstart file was rendered from the Foreman provisioning template "<%= @template_name %>".
-
+- Rocky
+description: |
+  The provisioning template for kickstart based distributions. The output is fetched by Anaconda installer during
+  the network based installation. To customize the installation, modify the host parameters.
+  This template accepts the following parameters:
+  - lang: string (default="en_US.UTF-8")
+  - selinux-mode: string (default="enforcing")
+  - keyboard: string (default="us")
+  - time-zone: string (default="UTC")
+  - http-proxy: string (default="")
+  - http-proxy-port: string (default="")
+  - force-puppet: boolean (default=false)
+  - enable-epel: boolean (default=true)
+  - enable-puppetlabs-repo: boolean (default=false)
+  - enable-puppetlabs-puppet5-repo: boolean (default=false)
+  - enable-puppetlabs-puppet6-repo: boolean (default=false)
+  - salt_master: string (default=undef)
+  - ntp-server: string (default=undef)
+  - bootloader-append: string (default="nofb quiet splash=quiet")
+  - disable-firewall: boolean (default=false)
+  - package_upgrade: boolean (default=true)
+  - disable-uek: boolean (default=false)
+  - use-ntp: boolean (default depends on OS release)
+  - fips_enabled: boolean (default=false)
+  
+  Reference links:
+  https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/6/html/installation_guide/s1-kickstart2-options
+  https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/installation_guide/sect-kickstart-syntax
+  https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/performing_an_advanced_rhel_installation/kickstart-commands-and-options-reference_installing-rhel-as-an-experienced-user
+-%>
 <%
   rhel_compatible = @host.operatingsystem.family == 'Redhat' && @host.operatingsystem.name != 'Fedora'
   is_fedora = @host.operatingsystem.name == 'Fedora'
@@ -44,8 +45,7 @@ https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/pe
   os_minor = @host.operatingsystem.minor.to_i
   realm_compatible = (@host.operatingsystem.name == 'Fedora' && os_major >= 20) || (rhel_compatible && os_major >= 7)
   # safemode renderer does not support unary negation
-  # pm_set = @host.puppetmaster.empty? ? false : true
-  pm_set = false
+  # pm_set = false
   proxy_uri = host_param('http-proxy') ? "http://#{host_param('http-proxy')}:#{host_param('http-proxy-port')}" : nil
   proxy_string = proxy_uri ? " --proxy=#{proxy_uri}" : ''
   puppet_enabled = pm_set || host_param_true?('force-puppet')
@@ -54,8 +54,12 @@ https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/pe
   section_end = (rhel_compatible && os_major <= 5) ? '' : '%end'
   use_ntp = host_param_true?('use-ntp') || (is_fedora && os_major < 16) || (rhel_compatible && os_major <= 7)
   iface = @host.provision_interface
+  appstream_present = false
 -%>
-
+# This kickstart file was rendered from the Foreman provisioning template "<%= @template_name %>".
+# for <%= @host %> running <%= @host.operatingsystem.name %> <%= os_major %> <%= @arch %>
+# Organization: <%= @host.organization %>
+# Location: <%= @host.location %>
 <% if (is_fedora && os_major < 29) || (rhel_compatible && os_major <= 7) -%>
 install
 <% end -%>
@@ -76,12 +80,7 @@ liveimg --url=<%= liveimg_url %> <%= proxy_string %>
 <% else %>
 <%= @mediapath %><%= proxy_string %>
 <% @additional_media.each do |medium| -%>
-<% if rhel_compatible && @host.operatingsystem.name.downcase.include?("centos") && os_major >= 8 && medium[:url] && medium[:url].include?("AppStream") -%>
-# renamed from "<%= medium[:url] %>" for CentOS Anaconda to work
-repo --name AppStream --baseurl <%= medium[:url] %>
-<% else -%>
 repo --name <%= medium[:name] %> --baseurl <%= medium[:url] %> <%= medium[:install] ? ' --install' : '' %><%= proxy_string %>
-<% end -%>
 <% end -%>
 <%= snippet_if_exists(template_name + " custom repositories") %>
 <% end %>
